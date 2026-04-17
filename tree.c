@@ -129,6 +129,44 @@ typedef struct {
     int count;
 } TreeIndex;
 
+static int load_index_for_tree(TreeIndex *index) {
+
+    index->count = 0;
+
+    FILE *f = fopen(INDEX_FILE, "r");
+    if (!f) {
+        if (errno == ENOENT) return 0;  // No index file yet = empty
+        return -1;
+    }
+
+    char line[2048];
+    while (fgets(line, sizeof(line), f)) {
+        if (index->count >= 10000) { fclose(f); return -1; }
+
+        TreeIndexEntry *e = &index->entries[index->count];
+        char hash_hex[HASH_HEX_SIZE + 1];
+        unsigned int mode;
+        unsigned long long mtime_ignored;
+        unsigned int size_ignored;
+        char path[512];
+
+        if (sscanf(line, "%o %64s %llu %u %511[^\n]",
+                   &mode, hash_hex, &mtime_ignored, &size_ignored, path) != 5) {
+            fclose(f);
+            return -1;
+        }
+
+        if (hex_to_hash(hash_hex, &e->hash) != 0) { fclose(f); return -1; }
+        
+        e->mode = mode;
+        snprintf(e->path, sizeof(e->path), "%s", path);
+        index->count++;
+    }
+    
+    fclose(f);
+    return 0;
+}
+
 // ─── TODO: Implement these ──────────────────────────────────────────────────
 
 // Build a tree hierarchy from the current index and write all tree
