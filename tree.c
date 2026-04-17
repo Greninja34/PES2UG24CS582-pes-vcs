@@ -15,6 +15,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 // ─── Mode Constants ─────────────────────────────────────────────────────────
 
@@ -113,6 +114,20 @@ int tree_serialize(const Tree *tree, void **data_out, size_t *len_out) {
     *len_out = offset;
     return 0;
 }
+
+
+int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
+
+typedef struct {
+    uint32_t mode;
+    ObjectID hash;
+    char path[512];
+} TreeIndexEntry;
+
+typedef struct {
+    TreeIndexEntry entries[10000];
+    int count;
+} TreeIndex;
 
 // ─── TODO: Implement these ──────────────────────────────────────────────────
 
