@@ -232,25 +232,12 @@ static int build_tree_level(const TreeIndex *index, const char *prefix, ObjectID
     free(data);
     return rc;
 }
+}
 
-// ─── TODO: Implement these ──────────────────────────────────────────────────
-
-// Build a tree hierarchy from the current index and write all tree
-// objects to the object store.
-//
-// HINTS - Useful functions and concepts for this phase:
-//   - index_load      : load the staged files into memory
-//   - strchr          : find the first '/' in a path to separate directories from files
-//   - strncmp         : compare prefixes to group files belonging to the same subdirectory
-//   - Recursion       : you will likely want to create a recursive helper function 
-//                       (e.g., `write_tree_level(entries, count, depth)`) to handle nested dirs.
-//   - tree_serialize  : convert your populated Tree struct into a binary buffer
-//   - object_write    : save that binary buffer to the store as OBJ_TREE
-//
-// Returns 0 on success, -1 on error.
 int tree_from_index(ObjectID *id_out) {
-    // TODO: Implement recursive tree building
-    // (See Lab Appendix for logical steps)
-    (void)id_out;
-    return -1;
+    if (!id_out) return -1;
+    TreeIndex index;
+    if (load_index_for_tree(&index) != 0) return -1;
+    if (index.count == 0) return -1;
+    return build_tree_level(&index, "", id_out);
 }
