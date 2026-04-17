@@ -1,23 +1,23 @@
-# PES-VCS Project Report
+# Operating Systems (UE24CS242B) - Orange Problem (Unit 4)
 
 ## Overview
 
 This repository contains a working implementation of PES-VCS, a small local version control system built in C. It stores file contents as hashed objects, builds trees from staged files, records commit history, and updates branch references through a HEAD pointer.
 
-## What Changed
+## Changes
 
 The implementation is split across four core source files:
 
-- `object.c`: stores and reads content-addressed objects with integrity checks
-- `tree.c`: builds tree objects from the staged index
-- `index.c`: loads, saves, and updates the staging area
-- `commit.c`: creates commits and updates repository history
+- `object.c` --> stores and reads content-addressed objects with integrity checks
+- `tree.c` --> builds tree objects from the staged index
+- `index.c` --> loads, saves, and updates the staging area
+- `commit.c` --> creates commits and updates repository history
 
 The result follows a simplified Git workflow:
 
-1. `pes add` stores file data in the object database and updates the index.
-2. `pes commit` builds a tree from the index and writes a commit object.
-3. `pes log` walks the commit chain through the branch reference.
+1. `pes add` --> stores file data in the object database and updates the index.
+2. `pes commit` --> builds a tree from the index and writes a commit object.
+3. `pes log` --> walks the commit chain through the branch reference.
 
 ## Build And Test
 
@@ -64,19 +64,21 @@ The implementation was verified with the object tests, tree tests, and the full 
 
 ![](screenshots/final/final2.png)
 
-## Notes
-
-The screenshots show the staged repository workflow, object storage layout, tree serialization output, commit history, reference chain, and the final integration test run.
 
 ## Analysis Answers
 
 ### Q5.1 — How would you implement `pes checkout <branch>`?
 
-If we want to build a `pes checkout <branch>` command, we basically need to change the working directory files to match the commit snapshot of the branch we are switching to. To do this, pes would first look inside `.pes/refs/heads/<branch>` to find the commit hash. Then it would change the `.pes/HEAD` file to point to our newly selected branch. Once it finds the commit object, it traverses its trees and replaces the contents of the files in our current working directory with the files from the tree, deleting any files that shouldn't exist in the new branch. `.pes/index` also has to be updated to match. The trickiest part of all this is making sure we don't accidentally overwrite any local changes that the user hasn't committed yet.
+If we want to build a `pes checkout <branch>` command, we basically need to change the working directory files to match the commit snapshot of the branch we are switching to. To do this, pes would first look inside `.pes/refs/heads/<branch>` to find the commit hash. Then it would change the `.pes/HEAD` file to point to our newly selected branch.
+
+Once it finds the commit object, it traverses its trees and replaces the contents of the files in our current working directory with the files from the tree, deleting any files that shouldn't exist in the new branch. `.pes/index` also has to be updated to match. The trickiest part of all this is making sure we don't accidentally overwrite any local changes that the user hasn't committed yet.
 
 ### Q5.2 — Detecting a "Dirty Working Directory" Conflict
 
-To prevent losing uncommitted work, we essentially need to compare three things. First, we calculate the hashes of our current working directory files and compare them with what's stored in `.pes/index` (or check size/mtime). This tells us if the user has modified anything locally. Next, we compare the tree belonging to our current branch against the tree of the branch we want to check out. This shows us what files will be changed by the checkout command itself. Finally, we look for an intersection: if there is a file that the user edited locally, AND that same file is scheduled to be changed by the checkout process, we have a conflict. In this scenario, we just show an error message and abort the checkout.
+To prevent losing uncommitted work, we essentially need to compare three things. 
+- 1st, we calculate the hashes of our current working directory files and compare them with what's stored in `.pes/index` (or check size/mtime). This tells us if the user has modified anything locally. 
+- 2nd, we compare the tree belonging to our current branch against the tree of the branch we want to check out. This shows us what files will be changed by the checkout command itself. 
+- 3rd, we look for an intersection --> if there is a file that the user edited locally, AND that same file is scheduled to be changed by the checkout process, we have a conflict. In this scenario, we just show an error message and abort the checkout.
 
 ### Q5.3 — Detached HEAD State
 
@@ -84,7 +86,10 @@ A "Detached HEAD" is basically when your `.pes/HEAD` file points to a raw commit
 
 ### Q6.1 — Garbage Collection Algorithm
 
-We can build a simple Garbage Collector by using a mark-and-sweep algorithm. First, we trace downwards starting from all branch reference heads, traversing through parent commits, and reading all their corresponding tree and blob objects. As we visit each object, we add its hash to a fast lookup hash-set to mark it as active. After tracing everything, we run a sweep: we go through every single file in the `.pes/objects/` folder, checking each file's hash against our hash-set. If it isn't in the list, we simply delete it to free up disk space. For a repo holding 100k commits and 50 branches, since branches share parent histories, we would traverse roughly 100k commit files plus a couple hundred thousand tree and blob files depending on file additions.
+We can build a simple Garbage Collector by using a "mark-and-sweep" algorithm. 
+- 1st we trace downwards starting from all branch reference heads, traversing through parent commits, and reading all their corresponding tree and blob objects. As we visit each object, we add its hash to a fast lookup hash-set to mark it as active.
+- After tracing everything, we run a sweep: we go through every single file in the `.pes/objects/` folder, checking each file's hash against our hash-set. If it isn't in the list, we simply delete it to free up disk space.
+- For a repo holding 100k commits and 50 branches, since branches share parent histories, we would traverse roughly 100k commit files plus a couple hundred thousand tree and blob files depending on file additions.
 
 ### Q6.2 — GC Race Condition with Concurrent Commit
 
