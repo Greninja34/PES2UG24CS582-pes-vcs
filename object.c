@@ -129,35 +129,72 @@ int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out
         fsync(dir_fd);
         close(dir_fd);
     }
-    
+
     free(full_obj);
     return 0;
 }
 
-// Read an object from the store.
-//
-// Steps:
-//   1. Build the file path from the hash using object_path()
-//   2. Open and read the entire file
-//   3. Parse the header to extract the type string and size
-//   4. Verify integrity: recompute the SHA-256 of the file contents
-//      and compare to the expected hash (from *id). Return -1 if mismatch.
-//   5. Set *type_out to the parsed ObjectType
-//   6. Allocate a buffer, copy the data portion (after the \0), set *data_out and *len_out
-//
-// HINTS - Useful syscalls and functions for this phase:
-//   - object_path        : getting the target file path
-//   - fopen, fread, fseek: reading the file into memory
-//   - memchr             : safely finding the '\0' separating header and data
-//   - strncmp            : parsing the type string ("blob", "tree", "commit")
-//   - compute_hash       : re-hashing the read data for integrity verification
-//   - memcmp             : comparing the computed hash against the requested hash
-//   - malloc, memcpy     : allocating and returning the extracted data
-//
-// The caller is responsible for calling free(*data_out).
-// Returns 0 on success, -1 on error (file not found, corrupt, etc.).
 int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_t *len_out) {
-    // TODO: Implement
-    (void)id; (void)type_out; (void)data_out; (void)len_out;
-    return -1;
+
+    char path[512];
+    object_path(id, path, sizeof(path));
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+
+    fseek(f, 0, SEEK_END);
+    long file_len = ftell(f);
+    if (file_len < 0) { fclose(f); return -1; }
+    rewind(f);
+
+    uint8_t *buf = malloc((size_t)file_len);
+    if (!buf) { fclose(f); return -1; }
+
+    if (fread(buf, 1, (size_t)file_len, f) != (size_t)file_len) {
+        free(buf);
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+
+    uint8_t *null_byte = memchr(buf, '\0', (size_t)file_len);
+    if (!null_byte) { free(buf); return -1; }
+
+    size_t header_len = (size_t)(null_byte - buf);
+    char header[64];
+    if (header_len >= sizeof(header)) { free(buf); return -1; }
+    memcpy(header, buf, header_len);
+    header[header_len] = '\0';
+
+    char type_str[16];
+    size_t claimed_size = 0;
+    if (sscanf(header, "%15s %zu", type_str, &claimed_size) != 2) {
+        free(buf);
+        return -1;
+    }
+
+    if (strcmp(type_str, "blob") == 0) *type_out = OBJ_BLOB;
+    else if (strcmp(type_str, "tree") == 0) *type_out = OBJ_TREE;
+    else if (strcmp(type_str, "commit") == 0) *type_out = OBJ_COMMIT;
+    else { free(buf); return -1; }
+
+    size_t data_len = (size_t)file_len - header_len - 1;
+    if (data_len != claimed_size) { free(buf); return -1; }
+
+    ObjectID verify_id;
+    compute_hash(buf, (size_t)file_len, &verify_id);
+    if (memcmp(&verify_id, id, sizeof(ObjectID)) != 0) {
+        free(buf);
+        return -1;
+    }
+
+    uint8_t *data = malloc(data_len > 0 ? data_len : 1);
+    if (!data) { free(buf); return -1; }
+    if (data_len > 0) memcpy(data, null_byte + 1, data_len);
+
+    *data_out = data;
+    *len_out = data_len;
+    
+    free(buf);
+    return 0;
 }
