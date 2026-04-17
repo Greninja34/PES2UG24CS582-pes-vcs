@@ -137,13 +137,6 @@ static int compare_index_entries(const void *a, const void *b) {
 
 // ─── TODO: Implement these ───────────────────────────────────────────────────
 
-// Load the index from .pes/index.
-//
-// HINTS - Useful functions:
-//   - fopen (with "r"), fscanf, fclose : reading the text file line by line
-//   - hex_to_hash                      : converting the parsed string to ObjectID
-//
-// Returns 0 on success, -1 on error.
 int index_load(Index *index) {
 
     if (!index) return -1;
@@ -188,26 +181,58 @@ int index_load(Index *index) {
         snprintf(e->path, sizeof(e->path), "%s", path);
         index->count++;
     }
-    
+
     fclose(f);
     return 0;
 }
 
-// Save the index to .pes/index atomically.
-//
-// HINTS - Useful functions and syscalls:
-//   - qsort                            : sorting the entries array by path
-//   - fopen (with "w"), fprintf        : writing to the temporary file
-//   - hash_to_hex                      : converting ObjectID for text output
-//   - fflush, fileno, fsync, fclose    : flushing userspace buffers and syncing to disk
-//   - rename                           : atomically moving the temp file over the old index
-//
-// Returns 0 on success, -1 on error.
 int index_save(const Index *index) {
-    // TODO: Implement atomic index saving
-    // (See Lab Appendix for logical steps)
-    (void)index;
-    return -1;
+    
+    if (!index) return -1;
+    
+    IndexEntry *sorted = NULL;
+    if (index->count > 0) {
+        sorted = malloc((size_t)index->count * sizeof(IndexEntry));
+        if (!sorted) return -1;
+        memcpy(sorted, index->entries, (size_t)index->count * sizeof(IndexEntry));
+        qsort(sorted, (size_t)index->count, sizeof(IndexEntry), compare_index_entries);
+    }
+
+    char tmp_path[512];
+    snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", INDEX_FILE);
+
+    FILE *f = fopen(tmp_path, "w");
+    if (!f) { free(sorted); return -1; }
+
+    for (int i = 0; i < index->count; i++) {
+        char hash_hex[HASH_HEX_SIZE + 1];
+        hash_to_hex(&sorted[i].hash, hash_hex);
+
+        if (fprintf(f, "%o %s %" PRIu64 " %u %s\n",
+                    sorted[i].mode,
+                    hash_hex,
+                    sorted[i].mtime_sec,
+                    sorted[i].size,
+                    sorted[i].path) < 0) {
+            free(sorted);
+            fclose(f);
+            unlink(tmp_path);
+            return -1;
+        }
+    }
+
+    fflush(f);
+    fsync(fileno(f));
+    fclose(f);
+
+    if (rename(tmp_path, INDEX_FILE) != 0) {
+        free(sorted);
+        unlink(tmp_path);
+        return -1;
+    }
+    
+    free(sorted);
+    return 0;
 }
 
 // Stage a file for the next commit.
