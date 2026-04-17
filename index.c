@@ -25,6 +25,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <inttypes.h>
+#include <time.h>
 
 int object_write(ObjectType type, const void *data, size_t len, ObjectID *id_out);
 
@@ -230,23 +231,52 @@ int index_save(const Index *index) {
         unlink(tmp_path);
         return -1;
     }
-    
+
     free(sorted);
     return 0;
 }
 
-// Stage a file for the next commit.
-//
-// HINTS - Useful functions and syscalls:
-//   - fopen, fread, fclose             : reading the target file's contents
-//   - object_write                     : saving the contents as OBJ_BLOB
-//   - stat / lstat                     : getting file metadata (size, mtime, mode)
-//   - index_find                       : checking if the file is already staged
-//
-// Returns 0 on success, -1 on error.
 int index_add(Index *index, const char *path) {
-    // TODO: Implement file staging
-    // (See Lab Appendix for logical steps)
-    (void)index; (void)path;
-    return -1;
+    if (!index || !path) return -1;
+
+    struct stat st;
+    if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        return -1;
+    }
+
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+
+    size_t data_len = (size_t)st.st_size;
+    void *data = malloc(data_len > 0 ? data_len : 1);
+    if (!data) { fclose(f); return -1; }
+
+    if (data_len > 0 && fread(data, 1, data_len, f) != data_len) {
+        free(data);
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+
+    ObjectID blob_id;
+    if (object_write(OBJ_BLOB, data, data_len, &blob_id) != 0) {
+        free(data);
+        return -1;
+    }
+    free(data);
+
+    IndexEntry *e = index_find(index, path);
+    if (!e) {
+        // New entry
+        if (index->count >= MAX_INDEX_ENTRIES) return -1;
+        e = &index->entries[index->count++];
+    }
+
+    e->mode = (st.st_mode & S_IXUSR) ? 0100755 : 0100644;
+    e->hash = blob_id;
+    e->mtime_sec = (uint64_t)st.st_mtime;
+    e->size = (uint32_t)st.st_size;
+    snprintf(e->path, sizeof(e->path), "%s", path);
+
+    return index_save(index);
 }
