@@ -16,6 +16,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <openssl/evp.h>
+#include <errno.h>
 
 // ─── PROVIDED ────────────────────────────────────────────────────────────────
 
@@ -194,7 +195,7 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
 
     *data_out = data;
     *len_out = data_len;
-    
+
     free(buf);
     return 0;
 }
