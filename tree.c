@@ -221,7 +221,8 @@ static int build_tree_level(const TreeIndex *index, const char *prefix, ObjectID
             entry->hash = child_id;
             snprintf(entry->name, sizeof(entry->name), "%s", dir_name);
         }
-    
+    }
+
     if (tree.count == 0) return -1;
 
     void *data = NULL;
@@ -231,7 +232,6 @@ static int build_tree_level(const TreeIndex *index, const char *prefix, ObjectID
     int rc = object_write(OBJ_TREE, data, len, id_out);
     free(data);
     return rc;
-}
 }
 
 int tree_from_index(ObjectID *id_out) {
