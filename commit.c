@@ -211,3 +211,40 @@ int commit_create(const char *message, ObjectID *commit_id_out) {
     if (head_update(commit_id_out) != 0) return -1;
     return 0;
 }
+
+/*
+commit --> 'Phase 4: single commit working'
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ make clean && make
+rm -f pes test_objects test_tree object.o tree.o index.o commit.o pes.o test_objects.o test_tree.o
+rm -rf .pes
+gcc -Wall -Wextra -O2 -c object.c -o object.o
+gcc -Wall -Wextra -O2 -c tree.c -o tree.o
+gcc -Wall -Wextra -O2 -c index.c -o index.o
+gcc -Wall -Wextra -O2 -c commit.c -o commit.o
+gcc -Wall -Wextra -O2 -c pes.c -o pes.o
+gcc -o pes object.o tree.o index.o commit.o pes.o -lcrypto
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ rm -rf .pes
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ export PES_AUTHOR="Vignesh <PES2UG24CS582>"
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ ./pes init
+Initialized empty PES repository in .pes/
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ echo "Hello" > hello.txt
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ ./pes add hello.txt
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ ./pes commit -m "Initial commit" 
+Committed: 47083f029522... Initial commit
+
+vignesh@fedora:~/Desktop/PES2UG24CS582-pes-vcs$ ./pes log
+commit 47083f0295222339c740029bd17c3008b977bf5dda03b4f9e64001f8d8b0527f
+Author: Vignesh <PES2UG24CS582>
+Date:   1776447810
+
+    Initial commit
+
+
+*/
